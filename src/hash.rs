@@ -17,12 +17,10 @@ pub fn hash_n(inputs: &[&[u8]]) -> Int {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     #[test]
     fn test_hash() {
-        let int = crate::hash::hash(b"it works");
-        let exp = crate::dec(
-            "114718067966976356955517098759415765868171761422675185365940576053772770837809",
-        );
-        assert_eq!(int, exp);
+        let expected = "fda02020fb19df5f442aa940a4c4c4e89bcc7f2bf1ea586f408973844fd78531";
+        assert_eq!(hash(b"it works"), hex(expected));
     }
 }
