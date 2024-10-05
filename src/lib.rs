@@ -1,6 +1,7 @@
 pub mod elliptic;
 pub mod hash;
 pub mod modulus;
+pub mod polynomial;
 
 pub use rug::Integer as Int;
 
