@@ -2,12 +2,11 @@ use rug::Integer as Int;
 
 use crate::modulus::Modulus;
 
-// y^2 = x^3 + ax + b mod n
+// y^2 = x^3 + ax + b (mod n)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Curve {
     pub modulus: Int,
     pub order: Int,
-    pub cofactor: u64,
     pub base: Point,
     pub a: Int,
     pub b: Int,
@@ -17,7 +16,6 @@ impl Curve {
     pub fn new(
         modulus: Int,
         order: Int,
-        cofactor: u64,
         base: Point,
         a: Int,
         b: Int,
@@ -25,7 +23,6 @@ impl Curve {
         Self {
             modulus,
             order,
-            cofactor,
             base,
             a,
             b,
@@ -54,14 +51,16 @@ impl Curve {
             let den = m.add(&p.y, &q.y);
             (num, den)
         };
-        let den = m.inv(&den).expect("mod inverse");
 
-        let lambda = m.mul(&num, &den);
+        let lambda = m.div(&num, &den).expect("lambda");
         let x = m.sub(&m.sub(&m.mul(&lambda, &lambda), &p.x), &q.x);
         let y = m.sub(&m.mul(&lambda, &m.sub(&p.x, &x)), &p.y);
 
         let ret = Point::new(x, y);
-        assert!(self.fits(&ret), "result point must fit the curve");
+        assert!(
+            self.fits(&ret),
+            "add result point must fit the curve"
+        );
         ret
     }
 
@@ -78,7 +77,10 @@ impl Curve {
             }
             bit -= 1;
         }
-        assert!(self.fits(&acc), "result point must fit the curve");
+        assert!(
+            self.fits(&acc),
+            "mul result point must fit the curve"
+        );
         acc
     }
 
@@ -155,7 +157,6 @@ pub mod curves {
     pub fn curve_256() -> Curve {
         let modulus = hex("2b000000000000000000000000000000000000000000000000000000000000001");
         let order = hex("2b0000000000000000000000000000002e7f521c85bba055a6e2161b956a47f69");
-        let cofactor = 1;
         let a = hex("1");
         let b = hex("a87");
 
@@ -163,8 +164,7 @@ pub mod curves {
         let y = hex("51277aeb91946f0cb83053a10f67c5a9ef00a4f0cf2466b3bedf4fdcd774b574");
         let base = Point::new(x, y);
 
-        let curve =
-            Curve::new(modulus, order, cofactor, base.clone(), a, b);
+        let curve = Curve::new(modulus, order, base.clone(), a, b);
         assert!(curve.fits(&base));
         curve
     }
@@ -173,7 +173,6 @@ pub mod curves {
     pub fn curve_bn254() -> Curve {
         let modulus = dec("21888242871839275222246405745257275088696311157297823662689037894645226208583");
         let order = dec("21888242871839275222246405745257275088548364400416034343698204186575808495617");
-        let cofactor = 1;
         let a = dec("0");
         let b = dec("3");
 
@@ -181,8 +180,7 @@ pub mod curves {
         let y = dec("2");
         let base = Point::new(x, y);
 
-        let curve =
-            Curve::new(modulus, order, cofactor, base.clone(), a, b);
+        let curve = Curve::new(modulus, order, base.clone(), a, b);
         assert!(curve.fits(&base));
         curve
     }
