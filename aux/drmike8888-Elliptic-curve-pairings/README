@@ -1,0 +1,137 @@
+COPY OF: https://github.com/drmike8888/Elliptic-curve-pairings/tree/b6e0e30f668f47bcbdbd02b8e0022fc1e90a88a1
+
+---
+
+This code is described in the book Elliptic Curve Cryptography for Developers.
+Before 2023 September 13 you can get it for 45% off with the code mlrosing2.
+The URL for the book page is: http://mng.bz/NVev
+The book won't be in print before 2024 January, so you can help improve the 
+text by making comments of what you think will make it better on the forum.
+
+I tried to split up the files by function. Modular arithmetic,
+elliptic curves, and protocols. Then polynomial arithmetic, polynomial
+elliptic curves and polynomial protocols. Plus lots of testing code.
+
+To actually build all these files to test them, drop into the Build_all 
+directory and use the Makefile there. Each of the chapters is separated out
+at the top level of the repo to identify where the code comes from. But all
+the example code depends on many previous chapters of object files to link
+with. So it is easier to actually just build it all from one place.
+
+modulo.c - This contains routines that compute GF(p)
+arithmetic. Fundamental to everything.
+
+eliptic.c - Contains routines to compute elliptic curve math on GF(p).
+
+eliptic_test.c - Check routines in eliptic.c actually function.
+
+base_protocols.c - Elliptic curve key exchange and digital signature
+algorithms on GF(p).
+
+poly.c - Basic math routines for GF(p^k). Polynomial math.
+
+test_mod.c - Test modulo subroutines with a few specific numbers. For
+debugging.
+
+poly_eliptic.c - Same as eliptic.c but uses GF(p^k) math.
+
+test_irrd.c - Test polynomial subroutines with specific
+polynomials. For debugging.
+
+base_curve_gen.c - Creates file for specific security level - 4
+choices. The field prime is fixed as are curves. For demonstration
+of how code works.
+
+base_test.c - Inputs files created by base_curve_gen and tests routines
+in base_protocols.c.
+
+Hilbert_Polynomials.list - Created from PARI/gp program. List of
+Hilbert Class Polynomials for finding j-invariant of elliptic curves.
+
+pairing_gen.c - First attempt at creating low embedding degree curves.
+
+pairing_sweep.c - Second attempt.
+
+pairing_phi6.c - Failed understanding of how low embedding degree works.
+
+pairing_sweep_alpha.c - Functioning low embedding degree search program.
+
+get_curve.c - Takes output from pairing_sweep_alpha and
+Hilbert_Polynomials.list to find coefficients of elliptic curve over GF(p).
+
+pairing.c - Subroutines to compute pairing operations on GF(p^k) curves.
+
+weil_6_bit_pairing.c - Example using GF(43^2) elliptic curves so every point
+can be printed out. Uses Weil pairing subroutines.
+
+tate_6_bit_pairing.c - same thing but uses Tate pairing subroutines.
+
+quotient_group.c - Used this to understand E/mE notation in math books.
+
+signature.c - Subroutines to compute multisignature aggregation using
+pairing mathematics.
+
+signatures_11_keygen.c - Create example parameters for pairing algorithms.
+
+signatures_11.c - Explicit example of pairing signature algorithm over
+GF(p^11).
+
+base_curves_embed.c - Attempt to find embedding degree of random curves. Best
+I could do is set ridiculous limit and say "it's way out there somewhere!"
+
+poly_exp_test.c - Test poly_pow() subroutine. Had trouble getting it right.
+
+There are several other programs that were quick and dirty test routines.
+
+The make file is exceptionally crude. The programs which you can run are:
+
+test_mod
+test_irrd
+pairing_gen
+pairing_sweep
+pairing_phi6
+pairing_sweep_alpha
+get_curve
+eliptic_test
+weil_6_bit_pairing
+tate_6_bit_pairing
+quotient_group
+signatures_11
+signatures_11_keygen
+base_curves_embed
+base_test
+base_curve_gen
+poly_exp_test
+tiny_pwer_chk
+snark_qap
+snark_crs
+snark_proof
+snark_verify
+signatures_2_keygen
+
+These are mostly in date of creation order, so test_mod is the first
+program that actually does anything using the subroutines in the first
+few chapters. Not all these are mentioned in the text - I don't think
+test_irrd is discussed anywhere. I don't know much about make - so
+just execute each one and test:
+
+make test_mod
+./test_mod
+make pairing_sweep_alpha
+./pairing_sweep_alpha
+(this one will demand a maximum range)
+
+If the .o files are not available, make will compile them. All the .c
+and .o files must be in the same directory or it won't work. 
+
+NOTE: run signatures_11_keygen before running signatures_11 to avoid
+getting an error "can't find file".
+
+The snark_* programs should be run in the order snark_qap, snark_crs, 
+snark_proof, and snark_verify. In addition, signatures_11_keygen should
+have already created the file curve_11_parameters.bin to create the elliptic 
+curve parameters used in this example. snark_qap creates the file snark.qap
+which is used with program snark_crs. snark_crs creates file snark.crs. Both
+snark.qap and snark.crs are used by snark_proof to create file snark_record.0.
+Program snark_verify reads in files snark.crs and snark_record.0
+to determine if the zero knowledge proof verifies.
