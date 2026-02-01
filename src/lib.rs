@@ -2,6 +2,7 @@ pub mod elliptic;
 pub mod hash;
 pub mod modulus;
 pub mod polynomial;
+pub mod snark;
 
 pub use rug::Integer as Int;
 
