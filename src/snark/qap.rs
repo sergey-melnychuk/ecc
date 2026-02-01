@@ -206,16 +206,6 @@ impl Qap {
 }
 
 /// Builder for constructing a QAP from circuit constraints.
-///
-/// Example usage mirrors snark_qap.c:
-/// ```ignore
-/// let mut builder = QapBuilder::new(5, 10, 4, &modulus);
-/// builder.set_gate_points(&[31, 37, 41, 43, 47]);
-/// builder.set_v(0, builder.lagrange(0));  // v0 = L_0
-/// builder.set_w(1, add_lagrange(&builder.lagrange(0), &builder.lagrange(2))); // w1 = L_0 + L_2
-/// // ... set up all constraints
-/// let qap = builder.build();
-/// ```
 pub struct QapBuilder {
     /// Number of gates
     n: usize,

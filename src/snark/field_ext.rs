@@ -286,9 +286,11 @@ impl Poly {
 
         result
     }
+}
 
+impl PartialEq for Poly {
     /// Compare two polynomials
-    pub fn eq(&self, other: &Poly) -> bool {
+    fn eq(&self, other: &Poly) -> bool {
         if self.deg != other.deg {
             return false;
         }
@@ -402,9 +404,11 @@ impl PolyPoint {
             y: neg_y,
         }
     }
+}
 
+impl PartialEq for PolyPoint {
     /// Check equality
-    pub fn eq(&self, other: &PolyPoint) -> bool {
+    fn eq(&self, other: &PolyPoint) -> bool {
         self.x.eq(&other.x) && self.y.eq(&other.y)
     }
 }

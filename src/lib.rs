@@ -1,3 +1,7 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::explicit_counter_loop)]
+#![allow(clippy::manual_memcpy)]
+
 pub mod elliptic;
 pub mod hash;
 pub mod modulus;
