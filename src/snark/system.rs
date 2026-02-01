@@ -228,7 +228,9 @@ pub fn read_poly<R: Read>(reader: &mut R) -> io::Result<Poly> {
     let mut deg_buf = [0u8; 8];
     reader.read_exact(&mut deg_buf)?;
     // The actual degree is in the first 4 bytes (little-endian on most systems)
-    let deg = i32::from_le_bytes([deg_buf[0], deg_buf[1], deg_buf[2], deg_buf[3]]) as usize;
+    let deg = i32::from_le_bytes([
+        deg_buf[0], deg_buf[1], deg_buf[2], deg_buf[3],
+    ]) as usize;
 
     let mut poly = Poly::new();
     poly.deg = deg;

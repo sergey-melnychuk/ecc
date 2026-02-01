@@ -2,15 +2,21 @@
 //!
 //! Runs the complete SNARK pipeline in one binary.
 
-use ecc::snark::{qap::create_example_qap, Crs, Prover, SigSystem, Verifier};
+use ecc::snark::{
+    qap::create_example_qap, Crs, Prover, SigSystem, Verifier,
+};
 use ecc::Int;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let base_path = "aux/drmike8888-Elliptic-curve-pairings/Build_all";
+    let base_path =
+        "aux/drmike8888-Elliptic-curve-pairings/Build_all";
 
     // Step 1: Load system parameters
     println!("=== Step 1: Load System Parameters ===");
-    let sys = SigSystem::load(&format!("{}/curve_11_parameters.bin", base_path))?;
+    let sys = SigSystem::load(&format!(
+        "{}/curve_11_parameters.bin",
+        base_path
+    ))?;
     println!("  Prime: {} bits", sys.prime.significant_bits());
     println!("  Torsion: {} bits", sys.tor.significant_bits());
     println!("  Extension degree: {}", sys.irrd.deg);
@@ -25,7 +31,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 3: Generate CRS (trusted setup)
     println!("\n=== Step 3: Generate CRS (Trusted Setup) ===");
     let crs = Crs::generate(&qap, &sys);
-    println!("  Generated {} G1 points", crs.z_g.len() + crs.theta_g.len() + crs.zt_g.len() + 3);
+    println!(
+        "  Generated {} G1 points",
+        crs.z_g.len() + crs.theta_g.len() + crs.zt_g.len() + 3
+    );
     println!("  Generated {} G2 points", crs.z_h.len() + 3);
 
     // Step 4: Create proof
@@ -44,12 +53,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prover = Prover::new(sys.clone(), qap, crs.clone());
     let record = prover.prove(&medicine, &dose, &patient);
 
-    println!("  Proof A: ({}, {})", 
-        &record.proof.a.x.to_string()[..20.min(record.proof.a.x.to_string().len())], 
-        "...");
-    println!("  Proof C: ({}, {})", 
-        &record.proof.c.x.to_string()[..20.min(record.proof.c.x.to_string().len())], 
-        "...");
+    println!(
+        "  Proof A: ({}, ...)",
+        &record.proof.a.x.to_string()
+            [..20.min(record.proof.a.x.to_string().len())]
+    );
+    println!(
+        "  Proof C: ({}, ...)",
+        &record.proof.c.x.to_string()
+            [..20.min(record.proof.c.x.to_string().len())]
+    );
 
     // Step 5: Verify proof
     println!("\n=== Step 5: Verify Proof ===");

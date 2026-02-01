@@ -158,7 +158,7 @@ impl Pairing {
             // T = 2T
             t = curve.add(&t, &t, &self.irrd, mod_p);
 
-            if m_order.get_bit(i as u32) {
+            if m_order.get_bit(i) {
                 // f = f * h_{T,P}(R)
                 let h = self.hpq(&t, p, r, curve);
                 f = f.mul(&h, &self.irrd, mod_p);

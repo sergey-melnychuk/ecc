@@ -63,9 +63,7 @@ impl LagrangeInterpolator {
         let mut index = limit - 1;
         for m in (0..rows).rev() {
             k[m].1 = index;
-            if index > 0 {
-                index -= 1;
-            }
+            index = index.saturating_sub(1);
         }
 
         k

@@ -276,7 +276,7 @@ impl Poly {
 
         let bits = exp.significant_bits();
         for i in 0..bits {
-            if exp.get_bit(i as u32) {
+            if exp.get_bit(i) {
                 result = result.mul(&base, irrd, m);
             }
             if i + 1 < bits {
@@ -527,7 +527,7 @@ impl PolyCurve {
 
         let bits = k.significant_bits();
         for i in 0..bits {
-            if k.get_bit(i as u32) {
+            if k.get_bit(i) {
                 result = self.add(&result, &base, irrd, m);
             }
             if i + 1 < bits {
