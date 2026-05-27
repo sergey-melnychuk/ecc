@@ -296,52 +296,30 @@ fn is_quad_residue(a: &Polynomial, irrd: &Polynomial, m: &Modulus) -> bool {
     r.degree() == 0 && r.get(0) == 1
 }
 
-/// Brute force sqrt for tiny GF(p^k) — iterate every element of the field
-/// and test which one squares to `a`. Used as a fallback when Tonelli–Shanks
-/// is too brittle on tiny pathological inputs. Returns None if no square root.
-fn poly_sqrt_bruteforce(
+/// Square root in GF(p^k). Fast path when `p^k ≡ 3 (mod 4)`; otherwise
+/// Tonelli–Shanks lifted to polynomials. Mirrors the structure of
+/// [`crate::modulus::Modulus::sqrt`] — same Wikipedia notation (M, c, t, R)
+/// to keep the algorithm legible. Returns None on non-residues.
+fn poly_sqrt(
     a: &Polynomial,
     irrd: &Polynomial,
     pm: &Modulus,
 ) -> Option<Polynomial> {
-    let k = irrd.degree();
-    let p = pm.n.clone();
-    let total = Int::from(p.clone().pow(k as u32));
-    let mut idx = Int::from(0);
-    while idx < total {
-        // Decode idx as base-p digits → polynomial of degree < k.
-        let mut cand = Polynomial::zeros(k);
-        let mut rem = idx.clone();
-        for i in 0..k {
-            let d = rem.clone() % &p;
-            cand.set(i, d.clone());
-            rem /= &p;
-        }
-        let cand = cand.trim();
-        let sq = cand.mul(&cand, irrd, pm);
-        if coef_eq_mod(&sq, a, pm) {
-            return Some(cand);
-        }
-        idx += 1;
+    if coef_zero_mod(a, pm) {
+        return Some(Polynomial::zeros(0));
     }
-    None
-}
-
-/// Square root in GF(p^k). Fast path when `p^k ≡ 3 (mod 4)`; otherwise
-/// Tonelli–Shanks lifted to polynomials. Returns None on non-residues.
-fn poly_sqrt(a: &Polynomial, irrd: &Polynomial, pm: &Modulus) -> Option<Polynomial> {
     if !is_quad_residue(a, irrd, pm) {
         return None;
     }
-    let pk = pm.n.clone().pow(irrd.degree() as u32);
+    let pk: Int = pm.n.clone().pow(irrd.degree() as u32);
 
-    // Fast path: pk ≡ 3 mod 4 → r = a^((pk+1)/4).
+    // Fast path: pk ≡ 3 mod 4 → sqrt(a) = a^((pk + 1)/4).
     if pk.get_bit(0) && pk.get_bit(1) {
         let exp = (pk + 1) / 4;
         return Some(a.pow(&exp, irrd, pm));
     }
 
-    // Tonelli–Shanks: write pk - 1 = 2^s * q with q odd.
+    // Decompose pk - 1 = q · 2^s with q odd.
     let mut q: Int = pk.clone() - 1;
     let mut s: u32 = 0;
     while !q.get_bit(0) {
@@ -349,51 +327,47 @@ fn poly_sqrt(a: &Polynomial, irrd: &Polynomial, pm: &Modulus) -> Option<Polynomi
         s += 1;
     }
 
-    // Find a non-residue z in GF(p^k), then y = z^q.
-    let mut y = loop {
-        let candidate = rand_poly(irrd.degree(), pm);
-        if coef_zero_mod(&candidate, pm) {
+    // Find a non-residue z; c = z^q has order exactly 2^s.
+    let z = loop {
+        let cand = rand_poly(irrd.degree(), pm);
+        if coef_zero_mod(&cand, pm) {
             continue;
         }
-        if !is_quad_residue(&candidate, irrd, pm) {
-            break candidate.pow(&q, irrd, pm);
+        if !is_quad_residue(&cand, irrd, pm) {
+            break cand;
         }
     };
-    let mut b = a.pow(&q, irrd, pm);
-    let exp_x = (q + 1) / 2;
-    let mut x = a.pow(&exp_x, irrd, pm);
-    let mut r = s;
+
+    let mut m_state: u32 = s;
+    let mut c = z.pow(&q, irrd, pm);
+    let mut t = a.pow(&q, irrd, pm);
+    let r_exp = (q + 1) / 2;
+    let mut r = a.pow(&r_exp, irrd, pm);
 
     loop {
-        if poly_is_one(&b) {
-            return Some(x);
+        if poly_is_one(&t) {
+            return Some(r);
         }
-        // Smallest k ∈ [1, r-1] such that b^(2^k) = 1. With a true QR input
-        // and y of full 2^s order, this loop is guaranteed to find such k.
-        let mut k: u32 = 1;
-        loop {
-            let e = Int::from(1) << k;
-            let bp = b.pow(&e, irrd, pm);
-            if poly_is_one(&bp) {
-                break;
+        // Smallest i ∈ [1, M) such that t^(2^i) = 1.
+        let mut i: u32 = 1;
+        let mut tmp = t.mul(&t, irrd, pm);
+        while !poly_is_one(&tmp) {
+            i += 1;
+            if i >= m_state {
+                // True QRs guarantee i < M; bail rather than loop.
+                return None;
             }
-            k += 1;
-            if k >= r {
-                // T-S can't reduce further. Fall back to brute force —
-                // necessary for very small fields where the trace-of-Frobenius
-                // setup makes y² lose its full 2^r-order property.
-                return poly_sqrt_bruteforce(a, irrd, pm);
-            }
+            tmp = tmp.mul(&tmp, irrd, pm);
         }
-        if k + 1 > r {
-            return poly_sqrt_bruteforce(a, irrd, pm);
-        }
-        let exp_t = Int::from(1) << (r - k - 1);
-        let t = y.pow(&exp_t, irrd, pm);
-        y = t.mul(&t, irrd, pm);
-        r = k;
-        x = x.mul(&t, irrd, pm);
-        b = b.mul(&y, irrd, pm);
+        // b = c^(2^(M - i - 1))
+        let shift = m_state - i - 1;
+        let exp = Int::from(1) << shift;
+        let b = c.pow(&exp, irrd, pm);
+        let b2 = b.mul(&b, irrd, pm);
+        m_state = i;
+        c = b2.clone();
+        t = t.mul(&b2, irrd, pm);
+        r = r.mul(&b, irrd, pm);
     }
 }
 

@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::Read;
-use std::ops::{Add, Div, Sub};
 
 use rug::{rand::RandState, Integer as Int};
 
@@ -68,78 +67,74 @@ impl Modulus {
         a.legendre(&self.n) == 1
     }
 
-    // Square root mod n: Tonelli and Shanks
-    // (Chapter 2.4, Listings 2.6, 2.7, 2.8)
+    // Square root mod n: Tonelli–Shanks (chapter 2.4).
+    // Returns None on quadratic non-residues; otherwise an x with x² ≡ a mod n.
     pub fn sqrt(&self, a: &Int) -> Option<Int> {
-        // Exit immediately if nonresidue
-        if !self.has_sqrt(a) {
+        // Reduce a mod n first; a = 0 has sqrt 0.
+        let a = self.add(a, &Int::ZERO);
+        if a.is_zero() {
+            return Some(Int::ZERO);
+        }
+        if !self.has_sqrt(&a) {
             return None;
         }
 
-        // Last 2 bits set? Return `x = a^((q+1)/4)`
-        if self.n.get_bit(0) && self.n.get_bit(1) {
-            let q = self.n.clone().add(Int::ONE).div(&Int::from(4));
-            let x = self.pow(a, &q)?;
-            return Some(x);
-        }
-
         let p = self.n.clone();
-        // `q = p - 1`
-        let mut q = p.clone().sub(Int::ONE);
-        // find number of binary zeros (first index of binary one)
-        let e = q.find_one(0).expect("e");
-        //  break down `p - 1` into `2^e * q`
-        for _ in 0..e {
-            q = q.div(2);
+        // Fast path when p ≡ 3 (mod 4): sqrt(a) = a^((p+1)/4).
+        if p.get_bit(0) && p.get_bit(1) {
+            let exp = Int::from(&p + 1) / 4;
+            return self.pow(&a, &exp);
         }
 
-        // find a generator
-        let n = loop {
-            // randomly search for nonresidue
-            let x = self.rand();
-            if self.has_sqrt(&x) {
-                break x;
+        // Decompose p - 1 = q · 2^s with q odd.
+        let mut q: Int = p.clone() - 1;
+        let mut s: u32 = 0;
+        while !q.get_bit(0) {
+            q >>= 1u32;
+            s += 1;
+        }
+
+        // Find a non-residue z to build a primitive 2^s-th root c = z^q.
+        let z = loop {
+            let cand = self.rand();
+            if !cand.is_zero() && !self.has_sqrt(&cand) {
+                break cand;
             }
         };
 
-        // initialize working components
-        let mut y = n.pow_mod(&q, &p).expect("y = n^q mod p");
-        let mut r = e;
-        let x = a
-            .clone()
-            .pow_mod(&q.clone().sub(Int::ONE).div(Int::from(2)), &p)
-            .expect("x = a^((q-1)/2) mod p");
-        let mut b = (a.clone() * x.clone() * x.clone()).modulo(&p);
-        let mut x = (a.clone() * x.clone()).modulo(&p);
+        // Standard Tonelli–Shanks state: M, c, t, r (Wikipedia notation).
+        let mut m_state: u32 = s;
+        let mut c = z.pow_mod(&q, &p).expect("c = z^q mod p");
+        let mut t = a.clone().pow_mod(&q, &p).expect("t = a^q mod p");
+        let r_exp = Int::from(&q + 1) / 2;
+        let mut r = a.pow_mod(&r_exp, &p).expect("r = a^((q+1)/2) mod p");
 
-        // loop on algorithm
         loop {
-            // Minimum `m` such that `b^(2^m) = 1 mod p`
-            let mut m = 1;
-            while m < r {
-                let one = b
-                    .clone()
-                    .pow_mod(&Int::from(1 << (m - 1)), &p)
-                    .expect("b^(2^m) = 1 mod p");
-                if &one == Int::ONE {
-                    break;
+            if t == 1 {
+                return Some(r);
+            }
+            // Smallest i ∈ [1, M) such that t^(2^i) = 1.
+            let mut i: u32 = 1;
+            let mut tmp =
+                t.clone().pow_mod(&Int::from(2), &p).expect("t²");
+            while tmp != 1 {
+                i += 1;
+                if i >= m_state {
+                    // Should not happen for a true QR; bail rather than loop.
+                    return None;
                 }
-                m += 1;
+                tmp = tmp.pow_mod(&Int::from(2), &p).expect("repeated sq");
             }
-            if m == r {
-                unreachable!("'should never happen because `a` is quadratic residue'");
-            }
-
-            let e = r - m - 1;
-            let e = 1 << (e - 1);
-            let t = y.clone().pow_mod(&Int::from(e), &p).expect("t");
-            y = t.clone().pow_mod(&Int::from(2), &p).expect("y");
-            r = m;
-            x = (x * t).modulo(&p);
-            b = (b * y.clone()).modulo(&p);
-            if &b == Int::ONE {
-                return Some(x);
-            }
+            // b = c^(2^(M-i-1))
+            let shift = m_state - i - 1;
+            let exp = Int::from(1) << shift;
+            let b = c.clone().pow_mod(&exp, &p).expect("b");
+            // Update: M = i, c = b², t = t·b², r = r·b
+            let b2 = b.clone().pow_mod(&Int::from(2), &p).expect("b²");
+            m_state = i;
+            c = b2.clone();
+            t = (t * &b2).modulo(&p);
+            r = (r * &b).modulo(&p);
         }
     }
 }
@@ -147,6 +142,24 @@ impl Modulus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Exercise Tonelli-Shanks (the slow `p ≡ 1 mod 4` path) — the BN254 base
+    /// field prime has p ≡ 1 mod 4 in the lower bits' sense for this test, so
+    /// the algorithm actually runs the Tonelli-Shanks loop. We square a known
+    /// integer and verify sqrt recovers it (up to sign).
+    #[test]
+    fn test_sqrt_tonelli_shanks_path() {
+        // Pick a prime that is ≡ 1 mod 4 to force the slow path.
+        // 13 ≡ 1 mod 4. has_sqrt(4) is true, sqrt(4) ∈ {2, 11}.
+        let m = Modulus::new(&Int::from(13));
+        let s = m.sqrt(&Int::from(4)).expect("sqrt(4) mod 13");
+        assert!(s == Int::from(2) || s == Int::from(11));
+        // Another QR: sqrt(9) ∈ {3, 10}.
+        let s = m.sqrt(&Int::from(9)).expect("sqrt(9) mod 13");
+        assert!(s == Int::from(3) || s == Int::from(10));
+        // Non-residue: sqrt(2) returns None.
+        assert!(m.sqrt(&Int::from(2)).is_none());
+    }
 
     #[test]
     fn test_rand_is_nondeterministic() {

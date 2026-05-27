@@ -8,6 +8,10 @@
 //! multi-signature schemes (membership keys, subgroup signing) layer on top of
 //! the same primitives.
 
+use std::fs::File;
+use std::io::{self, BufReader, Read};
+use std::path::Path;
+
 use rug::Integer as Int;
 
 use crate::elliptic::{Curve, Point};
@@ -225,6 +229,137 @@ fn find_aux(ec: &PolyCurve, tor: &Int) -> PolyPoint {
     panic!("no aux point found");
 }
 
+// ─── Binary loader for the book's `curve_*_parameters.bin` files ─────────
+//
+// File layout (matches `signature.c::get_system`):
+//   prime, a4, a6, cardE, tor, cobse, G1.x, G1.y    — each as mpz_raw
+//   irrd polynomial                                  — see read_poly
+//   cardEx, coxtd                                    — each as mpz_raw
+//   G2 = (poly, poly)                                — see read_poly_point
+//
+// `mpz_raw` is GMP's 4-byte-size + big-endian-bytes encoding. A poly is
+// stored as an 8-byte degree (lower 4 bytes little-endian) followed by
+// `deg + 1` `mpz_raw` coefficients.
+
+fn read_mpz_raw<R: Read>(reader: &mut R) -> io::Result<Int> {
+    let mut size_buf = [0u8; 4];
+    reader.read_exact(&mut size_buf)?;
+    let size = i32::from_be_bytes(size_buf);
+    let abs_size = size.unsigned_abs() as usize;
+    if abs_size == 0 {
+        return Ok(Int::ZERO);
+    }
+    let mut data = vec![0u8; abs_size];
+    reader.read_exact(&mut data)?;
+    let mut int = Int::from_digits(&data, rug::integer::Order::Msf);
+    if size < 0 {
+        int = -int;
+    }
+    Ok(int)
+}
+
+fn read_poly_dynamic<R: Read>(reader: &mut R) -> io::Result<Polynomial> {
+    // Degree is written as `sizeof(long) = 8` bytes; lower 4 bytes hold the
+    // value (little-endian on the systems this file was produced on).
+    let mut deg_buf = [0u8; 8];
+    reader.read_exact(&mut deg_buf)?;
+    let deg = i32::from_le_bytes([
+        deg_buf[0], deg_buf[1], deg_buf[2], deg_buf[3],
+    ]) as usize;
+    let mut p = Polynomial::zeros(deg + 1);
+    for i in 0..=deg {
+        p.set(i, read_mpz_raw(reader)?);
+    }
+    Ok(p.trim())
+}
+
+fn read_poly_point<R: Read>(reader: &mut R) -> io::Result<(Polynomial, Polynomial)> {
+    let x = read_poly_dynamic(reader)?;
+    let y = read_poly_dynamic(reader)?;
+    Ok((x, y))
+}
+
+/// Load a BLS system from the book's binary `curve_*_parameters.bin` format
+/// (the same files the snark binary uses). Picks an auxiliary point for the
+/// Weil pairing by sweeping until cofactor multiplication lands on a point
+/// of order coprime to `tor`.
+pub fn load_curve_params<P: AsRef<Path>>(path: P) -> io::Result<BlsSystem> {
+    let mut r = BufReader::new(File::open(path)?);
+    let prime = read_mpz_raw(&mut r)?;
+    let a4 = read_mpz_raw(&mut r)?;
+    let a6 = read_mpz_raw(&mut r)?;
+    let card_e = read_mpz_raw(&mut r)?;
+    let tor = read_mpz_raw(&mut r)?;
+    let cobse = read_mpz_raw(&mut r)?;
+    let g1_x = read_mpz_raw(&mut r)?;
+    let g1_y = read_mpz_raw(&mut r)?;
+
+    let irrd = read_poly_dynamic(&mut r)?;
+    let _card_ex = read_mpz_raw(&mut r)?;
+    let coxtd = read_mpz_raw(&mut r)?;
+    let (g2_x, g2_y) = read_poly_point(&mut r)?;
+
+    let g1 = Point::new(g1_x, g1_y);
+    let base_curve = Curve::new(prime.clone(), card_e.clone(), g1.clone(), a4.clone(), a6.clone());
+    if !base_curve.fits(&g1) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "loaded G1 is not on the base curve",
+        ));
+    }
+
+    let p_mod = crate::modulus::Modulus::new(&prime);
+    let mut a4_poly = Polynomial::zeros(1);
+    a4_poly.set(0, a4);
+    let mut a6_poly = Polynomial::zeros(1);
+    a6_poly.set(0, a6);
+    let ext_curve = PolyCurve::new(a4_poly, a6_poly, irrd, p_mod);
+
+    let g2 = PolyPoint::new(g2_x, g2_y);
+    if !ext_curve.fits(&g2) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "loaded G2 is not on the extension curve",
+        ));
+    }
+    let aux = find_aux_real(&ext_curve, &tor)?;
+    let _ = coxtd;
+
+    Ok(BlsSystem {
+        e: base_curve,
+        ex: ext_curve,
+        tor,
+        cobse,
+        g1,
+        g2,
+        aux,
+    })
+}
+
+/// Find an auxiliary point of order coprime to `tor` for the Weil pairing.
+/// For the cofactor-clearing trick to apply: any random point R times `tor`
+/// lands in the cofactor subgroup, which has order dividing `coxtd` and is
+/// therefore coprime to `tor` (whenever the curve is pairing-friendly).
+fn find_aux_real(ec: &PolyCurve, tor: &Int) -> io::Result<PolyPoint> {
+    let mut x = Polynomial::zeros(1);
+    x.set(0, Int::from(2));
+    for _ in 0..64 {
+        let Some((p, _)) = ec.embed(&x, 1) else {
+            x = bump(&x, ec);
+            continue;
+        };
+        let aux = ec.mul(&p, tor);
+        if !aux.is_inf() {
+            return Ok(aux);
+        }
+        x = bump(&p.x, ec);
+    }
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        "could not find suitable auxiliary point",
+    ))
+}
+
 fn bump(x: &Polynomial, ec: &PolyCurve) -> Polynomial {
     let m = &ec.p;
     let n = ec.irrd.degree();
@@ -308,6 +443,34 @@ mod tests {
         let (_sk2, pk2) = sys.keygen();
         let sig = sys.sign(&sk1, b"hi").expect("sign");
         assert!(!sys.verify(&pk2, b"hi", &sig));
+    }
+
+    const CURVE_11_PATH: &str =
+        "aux/drmike8888-Elliptic-curve-pairings/Build_all/curve_11_parameters.bin";
+
+    #[test]
+    fn test_load_curve_11_invariants() {
+        let sys = load_curve_params(CURVE_11_PATH).expect("load curve_11");
+        // G1 must be on the base curve and have order dividing card_E.
+        assert!(sys.e.fits(&sys.g1));
+        // [tor]·G1 = O
+        assert!(sys.e.mul(&sys.g1, &sys.tor).is_inf());
+        // G2 must be on the extension curve and have order dividing card_Ex.
+        assert!(sys.ex.fits(&sys.g2));
+        // [tor]·G2 = O
+        assert!(sys.ex.mul(&sys.g2, &sys.tor).is_inf());
+        // aux must be non-trivial and NOT in the tor-torsion subgroup.
+        assert!(!sys.aux.is_inf());
+        assert!(!sys.ex.mul(&sys.aux, &sys.tor).is_inf());
+    }
+
+    #[test]
+    #[ignore = "slow — uses real curve_11 system (~13s on a laptop)"]
+    fn test_bls_sign_verify_on_curve_11() {
+        let sys = load_curve_params(CURVE_11_PATH).expect("load curve_11");
+        let (sk, pk) = sys.keygen();
+        let sig = sys.sign(&sk, b"production-sized message").expect("sign");
+        assert!(sys.verify(&pk, b"production-sized message", &sig));
     }
 
     #[test]

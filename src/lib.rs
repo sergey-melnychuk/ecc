@@ -3,6 +3,8 @@
 #![allow(clippy::manual_memcpy)]
 
 pub mod bls;
+pub mod cm_curve;
+pub mod curve_search;
 pub mod elliptic;
 pub mod hash;
 pub mod modulus;
