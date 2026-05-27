@@ -95,8 +95,8 @@ fn bump(x: &Polynomial, ec: &PolyCurve) -> Polynomial {
 
 fn main() {
     let m = Modulus::new(&Int::from(43));
-    let irrd =
-        Polynomial::find_irreducible(2, &m).expect("irreducible deg-2");
+    let irrd = Polynomial::find_irreducible(2, &m)
+        .expect("irreducible deg-2");
     println!("Working in F_43[x] / <");
     print_poly(&irrd);
     println!(">");
@@ -137,17 +137,24 @@ fn main() {
         .map(|(p, _)| p)
         .expect("aux point");
 
-    println!("\nG1 x G1 test (order-11 in base subgroup) -----------");
+    println!(
+        "\nG1 x G1 test (order-11 in base subgroup) -----------"
+    );
     if g1_eleven.len() >= 3 {
         let p = g1_eleven[0];
         let q = g1_eleven[1];
         let t = g1_eleven[2];
         run_bilinearity_check(&ec, p, q, t, aux, &tor);
     } else {
-        println!("Not enough G1 order-11 points to test ({} found)", g1_eleven.len());
+        println!(
+            "Not enough G1 order-11 points to test ({} found)",
+            g1_eleven.len()
+        );
     }
 
-    println!("\nG1 x G2 test (mixed) --------------------------------");
+    println!(
+        "\nG1 x G2 test (mixed) --------------------------------"
+    );
     if !g1_eleven.is_empty() && g2_eleven.len() >= 2 {
         let p = g1_eleven[0];
         let q = g2_eleven[0];
@@ -157,14 +164,19 @@ fn main() {
         println!("Not enough mixed points to test");
     }
 
-    println!("\nG2 x G2 test ---------------------------------------");
+    println!(
+        "\nG2 x G2 test ---------------------------------------"
+    );
     if g2_eleven.len() >= 3 {
         let p = g2_eleven[0];
         let q = g2_eleven[1];
         let t = g2_eleven[2];
         run_bilinearity_check(&ec, p, q, t, aux, &tor);
     } else {
-        println!("Not enough G2 order-11 points to test ({} found)", g2_eleven.len());
+        println!(
+            "Not enough G2 order-11 points to test ({} found)",
+            g2_eleven.len()
+        );
     }
 }
 

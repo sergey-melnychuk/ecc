@@ -186,7 +186,11 @@ impl PolyCurve {
     /// Order of P given a list of candidate orders (factor sweep).
     /// Returns the first factor `r` such that `r*P = O`. None if none match.
     /// Mirrors `poly_get_order` from `pairing.c`.
-    pub fn order(&self, p: &PolyPoint, factors: &[Int]) -> Option<Int> {
+    pub fn order(
+        &self,
+        p: &PolyPoint,
+        factors: &[Int],
+    ) -> Option<Int> {
         for f in factors {
             if self.mul(p, f).is_inf() {
                 return Some(f.clone());
@@ -222,7 +226,11 @@ fn coef_zero_mod(p: &Polynomial, m: &Modulus) -> bool {
 }
 
 /// Subtract polynomials, reducing each coefficient mod p.
-fn poly_sub_mod(a: &Polynomial, b: &Polynomial, m: &Modulus) -> Polynomial {
+fn poly_sub_mod(
+    a: &Polynomial,
+    b: &Polynomial,
+    m: &Modulus,
+) -> Polynomial {
     let n = a.degree().max(b.degree()) + 1;
     let mut out = Polynomial::zeros(n);
     for i in 0..n {
@@ -243,7 +251,11 @@ fn poly_neg(p: &Polynomial, m: &Modulus) -> Polynomial {
 /// Increment the polynomial as if its coefficients were "digits base p".
 /// Bumps coef[0] by 1; on overflow (== 0 mod p) carries to coef[1] etc.
 /// Mirrors `FF_bump` from `poly_eliptic.c`.
-fn ff_bump(x: &Polynomial, irrd: &Polynomial, m: &Modulus) -> Polynomial {
+fn ff_bump(
+    x: &Polynomial,
+    irrd: &Polynomial,
+    m: &Modulus,
+) -> Polynomial {
     let n = irrd.degree();
     let one = Int::from(1);
     let mut out = Polynomial::zeros(n);
@@ -286,7 +298,11 @@ fn cmp_leading(a: &Polynomial, b: &Polynomial) -> i32 {
 }
 
 /// Euler criterion in GF(p^k): `a` is a QR iff `a^((p^k - 1)/2) == 1`.
-fn is_quad_residue(a: &Polynomial, irrd: &Polynomial, m: &Modulus) -> bool {
+fn is_quad_residue(
+    a: &Polynomial,
+    irrd: &Polynomial,
+    m: &Modulus,
+) -> bool {
     if coef_zero_mod(a, m) {
         return true;
     }
@@ -431,7 +447,8 @@ mod tests {
     /// extended by an irreducible of degree 2.
     fn tiny_curve() -> PolyCurve {
         let m = Modulus::new(&Int::from(43));
-        let irrd = Polynomial::find_irreducible(2, &m).expect("irreducible");
+        let irrd =
+            Polynomial::find_irreducible(2, &m).expect("irreducible");
 
         let mut a4 = Polynomial::zeros(1);
         a4.set(0, Int::from(23));

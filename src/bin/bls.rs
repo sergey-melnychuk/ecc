@@ -35,7 +35,9 @@ fn main() {
 
     let tampered = b"hello, tampered";
     if !sys.verify(&pk, tampered, &sig) {
-        println!("verify(pk, tampered, sig)    => REJECTED (expected)");
+        println!(
+            "verify(pk, tampered, sig)    => REJECTED (expected)"
+        );
     } else {
         println!("verify(pk, tampered, sig)    => OK (bug — should reject!)");
     }
@@ -47,7 +49,8 @@ fn main() {
         .iter()
         .map(|(sk, _)| sys.sign(sk, msg).expect("sign"))
         .collect();
-    let pks: Vec<_> = signers.iter().map(|(_, pk)| pk.clone()).collect();
+    let pks: Vec<_> =
+        signers.iter().map(|(_, pk)| pk.clone()).collect();
     let agg_sig = sys.aggregate_sigs(&sigs);
     let agg_pk = sys.aggregate_pks(&pks);
     println!(

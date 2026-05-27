@@ -54,7 +54,8 @@ impl Modulus {
         File::open("/dev/urandom")
             .and_then(|mut f| f.read_exact(&mut seed_bytes))
             .expect("seed Modulus::rand from /dev/urandom");
-        let seed = Int::from_digits(&seed_bytes, rug::integer::Order::Msf);
+        let seed =
+            Int::from_digits(&seed_bytes, rug::integer::Order::Msf);
         rng.seed(&seed);
         self.n.clone().random_below(&mut rng)
     }
@@ -107,7 +108,8 @@ impl Modulus {
         let mut c = z.pow_mod(&q, &p).expect("c = z^q mod p");
         let mut t = a.clone().pow_mod(&q, &p).expect("t = a^q mod p");
         let r_exp = Int::from(&q + 1) / 2;
-        let mut r = a.pow_mod(&r_exp, &p).expect("r = a^((q+1)/2) mod p");
+        let mut r =
+            a.pow_mod(&r_exp, &p).expect("r = a^((q+1)/2) mod p");
 
         loop {
             if t == 1 {
@@ -123,14 +125,17 @@ impl Modulus {
                     // Should not happen for a true QR; bail rather than loop.
                     return None;
                 }
-                tmp = tmp.pow_mod(&Int::from(2), &p).expect("repeated sq");
+                tmp = tmp
+                    .pow_mod(&Int::from(2), &p)
+                    .expect("repeated sq");
             }
             // b = c^(2^(M-i-1))
             let shift = m_state - i - 1;
             let exp = Int::from(1) << shift;
             let b = c.clone().pow_mod(&exp, &p).expect("b");
             // Update: M = i, c = b², t = t·b², r = r·b
-            let b2 = b.clone().pow_mod(&Int::from(2), &p).expect("b²");
+            let b2 =
+                b.clone().pow_mod(&Int::from(2), &p).expect("b²");
             m_state = i;
             c = b2.clone();
             t = (t * &b2).modulo(&p);

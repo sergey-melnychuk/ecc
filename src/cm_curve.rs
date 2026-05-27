@@ -82,7 +82,9 @@ fn parse_poly(s: &str) -> io::Result<Vec<Int>> {
         if term.is_empty() {
             continue;
         }
-        let (coef_str, deg) = if let Some((c, rest)) = term.split_once("*x") {
+        let (coef_str, deg) = if let Some((c, rest)) =
+            term.split_once("*x")
+        {
             let d = if let Some(exp) = rest.strip_prefix('^') {
                 exp.trim().parse::<usize>().map_err(|e| {
                     io::Error::new(
@@ -121,16 +123,14 @@ fn parse_poly(s: &str) -> io::Result<Vec<Int>> {
             // constant term.
             (term, 0)
         };
-        let c: Int = Int::from_str_radix(coef_str, 10).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("bad coefficient {coef_str:?}: {e}"),
-            )
-        })?;
-        coefs
-            .entry(deg)
-            .and_modify(|v| *v += &c)
-            .or_insert(c);
+        let c: Int =
+            Int::from_str_radix(coef_str, 10).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("bad coefficient {coef_str:?}: {e}"),
+                )
+            })?;
+        coefs.entry(deg).and_modify(|v| *v += &c).or_insert(c);
     }
     let max_deg = *coefs.keys().last().unwrap_or(&0);
     let mut out = vec![Int::ZERO; max_deg + 1];
@@ -254,8 +254,8 @@ fn roots_via_cz(hc: &Polynomial, m: &Modulus) -> Option<Vec<Int>> {
             }
             if cur.degree() == 2 {
                 let coefs = vec![cur.get(0), cur.get(1), cur.get(2)];
-                let (r1, r2) =
-                    two_roots(&coefs, m).expect("deg-2 splits over F_p");
+                let (r1, r2) = two_roots(&coefs, m)
+                    .expect("deg-2 splits over F_p");
                 roots.push(r1);
                 roots.push(r2);
                 break;
@@ -306,7 +306,10 @@ fn cz_split(a: &Polynomial, m: &Modulus) -> (Polynomial, Polynomial) {
         let gd = g.degree();
         if gd > 0 && gd < a.degree() {
             let (quotient, _) = a.euclid(&g, m);
-            return (normalize_mod(&g, m), normalize_mod(&quotient, m));
+            return (
+                normalize_mod(&g, m),
+                normalize_mod(&quotient, m),
+            );
         }
         // gcd was 1 or a — pick a new r and retry.
     }
@@ -396,7 +399,9 @@ pub fn get_curve(
     }
 
     // Try the twist of the first candidate.
-    if let Some((a4, a6)) = roots.first().and_then(|j| curve_from_j(j, p)) {
+    if let Some((a4, a6)) =
+        roots.first().and_then(|j| curve_from_j(j, p))
+    {
         if let Some((ta4, ta6)) = twist(&a4, &a6, p) {
             if let Some(curve) = try_card(&ta4, &ta6, p, &card_e) {
                 return Some(curve);
@@ -410,7 +415,12 @@ pub fn get_curve(
 /// satisfies `[card_e]·R = O`. Tries up to 32 random base points before
 /// giving up; this is high enough that the probability of all 32 R's having
 /// small order is negligible.
-fn try_card(a4: &Int, a6: &Int, p: &Int, card_e: &Int) -> Option<Curve> {
+fn try_card(
+    a4: &Int,
+    a6: &Int,
+    p: &Int,
+    card_e: &Int,
+) -> Option<Curve> {
     let m = Modulus::new(p);
     // Need a non-infinite base point. Sweep until we find one.
     let mut base = Point::inf();
@@ -479,9 +489,18 @@ mod tests {
     fn test_load_hilbert_table_known_entries() {
         let h = hilbert();
         // Linear cases — root of (x + c) is -c.
-        assert_eq!(h.get(7), Some(&[Int::from(3375), Int::from(1)][..]));
-        assert_eq!(h.get(11), Some(&[Int::from(32768), Int::from(1)][..]));
-        assert_eq!(h.get(43), Some(&[Int::from(884736000), Int::from(1)][..]));
+        assert_eq!(
+            h.get(7),
+            Some(&[Int::from(3375), Int::from(1)][..])
+        );
+        assert_eq!(
+            h.get(11),
+            Some(&[Int::from(32768), Int::from(1)][..])
+        );
+        assert_eq!(
+            h.get(43),
+            Some(&[Int::from(884736000), Int::from(1)][..])
+        );
         // Quadratic case.
         let q = h.get(15).unwrap();
         assert_eq!(q.len(), 3);
@@ -503,8 +522,7 @@ mod tests {
     #[test]
     fn test_hcp_roots_quadratic_with_real_root() {
         // x² - 1 mod 11 → roots {1, -1}.
-        let coefs =
-            vec![Int::from(-1), Int::from(0), Int::from(1)];
+        let coefs = vec![Int::from(-1), Int::from(0), Int::from(1)];
         let mut roots =
             hcp_roots(&coefs, &Int::from(11)).expect("roots");
         roots.sort();
@@ -563,7 +581,10 @@ mod tests {
                             acc = m.add(&acc, &m.mul(c, &pwr));
                             pwr = m.mul(&pwr, r);
                         }
-                        assert!(acc.is_zero(), "root {r} fails hc(r) mod {p}");
+                        assert!(
+                            acc.is_zero(),
+                            "root {r} fails hc(r) mod {p}"
+                        );
                     }
                     return;
                 }
@@ -587,7 +608,10 @@ mod tests {
         .unwrap();
         let h = hilbert();
         let d = find_cm_discriminant(&h, &p, &t);
-        assert!(d.is_some(), "could not find a CM discriminant in the table");
+        assert!(
+            d.is_some(),
+            "could not find a CM discriminant in the table"
+        );
         // Sanity: 4p − t² should equal |D|·s² for some integer s.
         let d = d.unwrap();
         println!("curve_11 CM discriminant: D = -{d}");
@@ -643,10 +667,14 @@ mod tests {
                 assert_eq!(curve.order, card);
                 // Sanity: base point lies on curve, and [card]·G = O.
                 assert!(curve.fits(&curve.base));
-                assert!(curve.mul(&curve.base, &curve.order).is_inf());
+                assert!(curve
+                    .mul(&curve.base, &curve.order)
+                    .is_inf());
                 return;
             }
         }
-        panic!("none of the candidate t values produced a valid curve");
+        panic!(
+            "none of the candidate t values produced a valid curve"
+        );
     }
 }

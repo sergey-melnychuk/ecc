@@ -64,17 +64,26 @@ impl Curve {
         if nums.len() != 7 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("expected 7 numeric lines, got {}", nums.len()),
+                format!(
+                    "expected 7 numeric lines, got {}",
+                    nums.len()
+                ),
             ));
         }
         let parse_hex = |s: &str| {
             Int::from_str_radix(s, 16).map_err(|e| {
-                io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )
             })
         };
         let parse_dec = |s: &str| {
             Int::from_str_radix(s, 10).map_err(|e| {
-                io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    e.to_string(),
+                )
             })
         };
         let modulus = parse_hex(nums[0])?;
@@ -230,7 +239,8 @@ pub mod curves {
 
     // Curve_160_params.dat
     pub fn curve_160() -> Curve {
-        let modulus = hex("ac000000000000000000000000000000000000001");
+        let modulus =
+            hex("ac000000000000000000000000000000000000001");
         let order = hex("ac0000000000000000006543ba11adf8eb6345c77");
         let a = hex("1");
         let b = hex("782e");
@@ -349,8 +359,7 @@ mod tests {
     /// shipped in `aux/`. If the .dat ever changes upstream we want to know.
     #[test]
     fn test_from_dat_matches_hardcoded() {
-        let aux =
-            "aux/drmike8888-Elliptic-curve-pairings/Build_all";
+        let aux = "aux/drmike8888-Elliptic-curve-pairings/Build_all";
         for (bits, expected) in [
             (160, curve_160()),
             (256, curve_256()),
@@ -358,10 +367,12 @@ mod tests {
             (512, curve_512()),
         ] {
             let path = format!("{aux}/Curve_{bits}_params.dat");
-            let loaded = Curve::from_dat(&path).unwrap_or_else(|e| {
-                panic!("loading {path}: {e}")
-            });
-            assert_eq!(loaded.modulus, expected.modulus, "{bits}: modulus");
+            let loaded = Curve::from_dat(&path)
+                .unwrap_or_else(|e| panic!("loading {path}: {e}"));
+            assert_eq!(
+                loaded.modulus, expected.modulus,
+                "{bits}: modulus"
+            );
             assert_eq!(loaded.order, expected.order, "{bits}: order");
             assert_eq!(loaded.a, expected.a, "{bits}: a4");
             assert_eq!(loaded.b, expected.b, "{bits}: a6");
@@ -442,7 +453,10 @@ mod tests {
         let modulus = Modulus::new(&ec.modulus);
         let neg_p = Point::new(p.x.clone(), modulus.neg(&p.y));
         let sum = ec.add(&p, &neg_p);
-        assert!(sum.is_inf(), "P + (-P) must be the point at infinity");
+        assert!(
+            sum.is_inf(),
+            "P + (-P) must be the point at infinity"
+        );
     }
 
     #[test]

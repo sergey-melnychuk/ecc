@@ -135,8 +135,8 @@ fn run_tate(
 
 fn main() {
     let m = Modulus::new(&Int::from(43));
-    let irrd =
-        Polynomial::find_irreducible(2, &m).expect("irreducible deg-2");
+    let irrd = Polynomial::find_irreducible(2, &m)
+        .expect("irreducible deg-2");
     print!("Working in F_43[x] / <");
     print_poly(&irrd);
     println!(">");

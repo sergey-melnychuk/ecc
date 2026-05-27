@@ -20,10 +20,10 @@ pub fn cardinality(t: &Int, k: u32, p: &Int) -> Int {
     let mut v0 = Int::from(2);
     let mut v1 = t.clone();
     if k == 0 {
-        return Int::from(p.clone().pow(k)) + 1 - v0;
+        return p.clone().pow(k) + 1 - v0;
     }
     if k == 1 {
-        return Int::from(p.clone().pow(1u32)) + 1 - v1;
+        return p.clone().pow(1u32) + 1 - v1;
     }
     let mut vk = v1.clone();
     for _ in 2..=k {
@@ -31,7 +31,7 @@ pub fn cardinality(t: &Int, k: u32, p: &Int) -> Int {
         v0 = v1;
         v1 = vk.clone();
     }
-    Int::from(p.clone().pow(k)) + 1 - vk
+    p.clone().pow(k) + 1 - vk
 }
 
 /// Miller's line/slope function: `h_{P,Q}(R)` per AEC p. 394.
@@ -156,14 +156,18 @@ pub fn tate(
     let t1 = miller(ec, p, &qps, m);
     let t2 = miller(ec, p, s, m);
     let t = t1.div(&t2, irrd, pm);
-    let pk = Int::from(pm.n.clone().pow(irrd.degree() as u32));
+    let pk = pm.n.clone().pow(irrd.degree() as u32);
     let exp = Int::from(&pk - 1) / m;
     t.pow(&exp, irrd, pm)
 }
 
 /// Order of `P` on a base curve given a factor list. First factor `r` such
 /// that `r*P` is infinity wins. None if none match.
-pub fn get_order(ec: &Curve, p: &Point, factors: &[Int]) -> Option<Int> {
+pub fn get_order(
+    ec: &Curve,
+    p: &Point,
+    factors: &[Int],
+) -> Option<Int> {
     for f in factors {
         if ec.mul(p, f).is_inf() {
             return Some(f.clone());
@@ -188,7 +192,11 @@ fn poly_neg(p: &Polynomial, m: &Modulus) -> Polynomial {
     out.trim()
 }
 
-fn poly_sub_mod(a: &Polynomial, b: &Polynomial, m: &Modulus) -> Polynomial {
+fn poly_sub_mod(
+    a: &Polynomial,
+    b: &Polynomial,
+    m: &Modulus,
+) -> Polynomial {
     let n = a.degree().max(b.degree()) + 1;
     let mut out = Polynomial::zeros(n);
     for i in 0..n {
@@ -214,7 +222,8 @@ mod tests {
     /// trace t = −11 and reports |E(F_{p²})| = 1815 = 3·5·11².
     fn tiny_curve() -> PolyCurve {
         let m = Modulus::new(&Int::from(43));
-        let irrd = Polynomial::find_irreducible(2, &m).expect("irreducible");
+        let irrd =
+            Polynomial::find_irreducible(2, &m).expect("irreducible");
         let mut a4 = Polynomial::zeros(1);
         a4.set(0, Int::from(23));
         let mut a6 = Polynomial::zeros(1);
@@ -374,7 +383,8 @@ mod tests {
         // [order]·G = O via get_order.
         let ec = crate::elliptic::curves::curve_bn254();
         let order = ec.order.clone();
-        let found = get_order(&ec, &ec.base, std::slice::from_ref(&order));
+        let found =
+            get_order(&ec, &ec.base, std::slice::from_ref(&order));
         assert_eq!(found, Some(order));
     }
 }

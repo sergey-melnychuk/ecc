@@ -172,7 +172,9 @@ impl Polynomial {
 
         while !r.is_zero() && r.degree() >= b.degree() {
             let j = r.degree() - b.degree();
-            let s = m.div(&r.get(r.degree()), &b.get(b.degree())).unwrap();
+            let s = m
+                .div(&r.get(r.degree()), &b.get(b.degree()))
+                .unwrap();
             q.set(j, s.clone());
             for i in 0..=b.degree() {
                 let sb = m.mul(&s, &b.get(i));
@@ -206,7 +208,11 @@ impl Polynomial {
             bw = r;
         }
 
-        if bw.is_zero() { aw } else { bw }
+        if bw.is_zero() {
+            aw
+        } else {
+            bw
+        }
     }
 
     // Listing 10.4 + 10.5: Inverse of self modulo irreducible
@@ -255,14 +261,24 @@ impl Polynomial {
     }
 
     // Listing 10.6: Division self/other modulo irreducible
-    pub fn div(&self, other: &Self, irreducible: &Self, m: &Modulus) -> Self {
+    pub fn div(
+        &self,
+        other: &Self,
+        irreducible: &Self,
+        m: &Modulus,
+    ) -> Self {
         let inv = other.inv(irreducible, m);
         self.mul(&inv, irreducible, m)
     }
 
     // Listing 9.1 + 9.2: Polynomial exponentiation g^k mod irreducible
     // Uses square-and-multiply (MSB to LSB)
-    pub fn pow(&self, k: &Int, irreducible: &Self, m: &Modulus) -> Self {
+    pub fn pow(
+        &self,
+        k: &Int,
+        irreducible: &Self,
+        m: &Modulus,
+    ) -> Self {
         let bits = k.significant_bits();
         if bits == 0 {
             let mut one = Self::zeros(1);
@@ -289,7 +305,11 @@ impl Polynomial {
         self.pow(&m.n, irreducible, m)
     }
 
-    // Listing 9.5: Raise polynomial to (p-1)/2 — Euler criterion
+    // Listing 9.5: raise a polynomial to `(p-1)/2` where `p` is the *base*
+    // prime — not the GF(p^k) Euler criterion (that exponent is `(p^k-1)/2`).
+    // This is the half-power used by the Cantor–Zassenhaus split step over
+    // F_p: `(x + r)^((p-1)/2) mod f` is +1 or −1 at each F_p-root of `f`,
+    // which lets a random `r` separate roots into two halves.
     pub fn gpow_p2(&self, irreducible: &Self, m: &Modulus) -> Self {
         let exp = Int::from(&m.n - 1) / 2;
         self.pow(&exp, irreducible, m)

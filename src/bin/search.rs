@@ -17,14 +17,10 @@ use ecc::Int;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-    let k: u32 = args
-        .get(1)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
-    let lg2r: u32 = args
-        .get(2)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(40);
+    let k: u32 =
+        args.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
+    let lg2r: u32 =
+        args.get(2).and_then(|s| s.parse().ok()).unwrap_or(40);
 
     println!(
         "# Searching for pairing-friendly curves: k = {k}, log2(r) ≤ {lg2r}\n"
@@ -36,7 +32,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    println!("Found {} candidate(s). Top by rho:\n", candidates.len());
+    println!(
+        "Found {} candidate(s). Top by rho:\n",
+        candidates.len()
+    );
     for (i, c) in candidates.iter().take(5).enumerate() {
         println!(
             "  [{i}] alpha = {alpha}, x = {x}, rho = {rho:.4}, |r| = {rsz}b, |q| = {qsz}b",
@@ -53,9 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // Try each candidate until one admits a CM construction we can complete.
-    println!("\n# Building a curve from the first viable candidate...\n");
+    println!(
+        "\n# Building a curve from the first viable candidate...\n"
+    );
     for (idx, c) in candidates.iter().enumerate() {
-        let Some(d) = find_cm_discriminant(&hilbert, &c.q, &c.t) else {
+        let Some(d) = find_cm_discriminant(&hilbert, &c.q, &c.t)
+        else {
             println!("  [{idx}] no CM discriminant in table");
             continue;
         };
@@ -69,7 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Print in the labeled-text format the book uses for Curve_*_params.dat.
         let card_e: Int = c.q.clone() + 1 - &c.t;
         let cofactor: Int = card_e.clone() / &c.r;
-        println!("\n# Curve_k{k}_alpha{alpha}_x{x}_D{d}.dat\n",
+        println!(
+            "\n# Curve_k{k}_alpha{alpha}_x{x}_D{d}.dat\n",
             alpha = c.alpha,
             x = c.x,
         );

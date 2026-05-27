@@ -81,11 +81,19 @@ impl BlsSystem {
     }
 
     /// BLS verify: returns true iff `e(σ, G2) == e(H(m), PK)`.
-    pub fn verify(&self, pk: &PolyPoint, msg: &[u8], sig: &Point) -> bool {
-        let Some(h) = self.hash_to_g1(msg) else { return false; };
+    pub fn verify(
+        &self,
+        pk: &PolyPoint,
+        msg: &[u8],
+        sig: &Point,
+    ) -> bool {
+        let Some(h) = self.hash_to_g1(msg) else {
+            return false;
+        };
         let h2 = to_g2(&h);
         let sig2 = to_g2(sig);
-        let w_sig = weil(&self.ex, &sig2, &self.g2, &self.aux, &self.tor);
+        let w_sig =
+            weil(&self.ex, &sig2, &self.g2, &self.aux, &self.tor);
         let w_pk = weil(&self.ex, &h2, pk, &self.aux, &self.tor);
         w_sig == w_pk
     }
@@ -121,8 +129,8 @@ impl BlsSystem {
 /// Build the tiny demo system used in chapters 16–18: p=43, k=2, tor=11.
 pub fn tiny_system() -> BlsSystem {
     let p = crate::modulus::Modulus::new(&Int::from(43));
-    let irrd =
-        Polynomial::find_irreducible(2, &p).expect("irreducible deg-2");
+    let irrd = Polynomial::find_irreducible(2, &p)
+        .expect("irreducible deg-2");
 
     // Base curve y² = x³ + 23x + 42 mod 43.
     let card_e = Int::from(55); // p + 1 - t with t = -11
@@ -258,7 +266,9 @@ fn read_mpz_raw<R: Read>(reader: &mut R) -> io::Result<Int> {
     Ok(int)
 }
 
-fn read_poly_dynamic<R: Read>(reader: &mut R) -> io::Result<Polynomial> {
+fn read_poly_dynamic<R: Read>(
+    reader: &mut R,
+) -> io::Result<Polynomial> {
     // Degree is written as `sizeof(long) = 8` bytes; lower 4 bytes hold the
     // value (little-endian on the systems this file was produced on).
     let mut deg_buf = [0u8; 8];
@@ -273,7 +283,9 @@ fn read_poly_dynamic<R: Read>(reader: &mut R) -> io::Result<Polynomial> {
     Ok(p.trim())
 }
 
-fn read_poly_point<R: Read>(reader: &mut R) -> io::Result<(Polynomial, Polynomial)> {
+fn read_poly_point<R: Read>(
+    reader: &mut R,
+) -> io::Result<(Polynomial, Polynomial)> {
     let x = read_poly_dynamic(reader)?;
     let y = read_poly_dynamic(reader)?;
     Ok((x, y))
@@ -283,7 +295,9 @@ fn read_poly_point<R: Read>(reader: &mut R) -> io::Result<(Polynomial, Polynomia
 /// (the same files the snark binary uses). Picks an auxiliary point for the
 /// Weil pairing by sweeping until cofactor multiplication lands on a point
 /// of order coprime to `tor`.
-pub fn load_curve_params<P: AsRef<Path>>(path: P) -> io::Result<BlsSystem> {
+pub fn load_curve_params<P: AsRef<Path>>(
+    path: P,
+) -> io::Result<BlsSystem> {
     let mut r = BufReader::new(File::open(path)?);
     let prime = read_mpz_raw(&mut r)?;
     let a4 = read_mpz_raw(&mut r)?;
@@ -300,7 +314,13 @@ pub fn load_curve_params<P: AsRef<Path>>(path: P) -> io::Result<BlsSystem> {
     let (g2_x, g2_y) = read_poly_point(&mut r)?;
 
     let g1 = Point::new(g1_x, g1_y);
-    let base_curve = Curve::new(prime.clone(), card_e.clone(), g1.clone(), a4.clone(), a6.clone());
+    let base_curve = Curve::new(
+        prime.clone(),
+        card_e.clone(),
+        g1.clone(),
+        a4.clone(),
+        a6.clone(),
+    );
     if !base_curve.fits(&g1) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -354,10 +374,7 @@ fn find_aux_real(ec: &PolyCurve, tor: &Int) -> io::Result<PolyPoint> {
         }
         x = bump(&p.x, ec);
     }
-    Err(io::Error::new(
-        io::ErrorKind::Other,
-        "could not find suitable auxiliary point",
-    ))
+    Err(io::Error::other("could not find suitable auxiliary point"))
 }
 
 fn bump(x: &Polynomial, ec: &PolyCurve) -> Polynomial {
@@ -450,7 +467,8 @@ mod tests {
 
     #[test]
     fn test_load_curve_11_invariants() {
-        let sys = load_curve_params(CURVE_11_PATH).expect("load curve_11");
+        let sys =
+            load_curve_params(CURVE_11_PATH).expect("load curve_11");
         // G1 must be on the base curve and have order dividing card_E.
         assert!(sys.e.fits(&sys.g1));
         // [tor]·G1 = O
@@ -467,9 +485,11 @@ mod tests {
     #[test]
     #[ignore = "slow — uses real curve_11 system (~13s on a laptop)"]
     fn test_bls_sign_verify_on_curve_11() {
-        let sys = load_curve_params(CURVE_11_PATH).expect("load curve_11");
+        let sys =
+            load_curve_params(CURVE_11_PATH).expect("load curve_11");
         let (sk, pk) = sys.keygen();
-        let sig = sys.sign(&sk, b"production-sized message").expect("sign");
+        let sig =
+            sys.sign(&sk, b"production-sized message").expect("sign");
         assert!(sys.verify(&pk, b"production-sized message", &sig));
     }
 

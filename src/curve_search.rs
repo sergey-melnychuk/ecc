@@ -68,7 +68,7 @@ pub fn qofz_20(k: u32, alpha: &Int, x: &Int) -> Int {
     let k2 = k1 / 2;
     let t1: Int = z.clone().pow(k1);
     let t2: Int = z.clone().pow(k);
-    let t3: Int = Int::from(z.clone().pow(k2)) * 4;
+    let t3: Int = z.clone().pow(k2) * 4;
     let t4: Int = z.clone() + 1;
     let sum: Int = t1 + t2 + t3 + t4;
     sum / 4
@@ -80,7 +80,7 @@ pub fn qofz_2(k: u32, alpha: &Int, x: &Int) -> Int {
     let k1 = k + 1;
     let k2 = k + 2;
     let t1: Int = z.clone().pow(k2);
-    let t2: Int = Int::from(z.clone().pow(k1)) * 2;
+    let t2: Int = z.clone().pow(k1) * 2;
     let t3: Int = z.clone().pow(k);
     let z_minus_1: Int = z.clone() - 1;
     let t4: Int = z_minus_1.clone() * z_minus_1;
@@ -91,8 +91,8 @@ pub fn qofz_2(k: u32, alpha: &Int, x: &Int) -> Int {
 /// Trace of Frobenius for algorithm 6.20: `t = (αx²)^((k+1)/2) + 1`.
 pub fn tofz_20(k: u32, alpha: &Int, x: &Int) -> Int {
     let z: Int = (Int::from(x * x)) * alpha;
-    let k1 = (k + 1) / 2;
-    Int::from(z.pow(k1)) + 1
+    let k1 = k.div_ceil(2);
+    z.pow(k1) + 1
 }
 
 /// Trace of Frobenius for algorithm 6.2: `t = 1 - αx²`.
@@ -141,7 +141,10 @@ pub fn sweep(k: u32, lg2_r_max: u32) -> Vec<Candidate> {
                     let (q, t) = if algt {
                         (qofz_2(k, &alpha, &x), tofz_2(k, &alpha, &x))
                     } else {
-                        (qofz_20(k, &alpha, &x), tofz_20(k, &alpha, &x))
+                        (
+                            qofz_20(k, &alpha, &x),
+                            tofz_20(k, &alpha, &x),
+                        )
                     };
                     let qsz = q.significant_bits();
                     if qsz > 0 && is_prob_prime(&q, 25) {
@@ -211,7 +214,10 @@ mod tests {
         // where both r and q are prime. We check the basic invariants on the
         // first candidate found.
         let candidates = sweep(5, 40);
-        assert!(!candidates.is_empty(), "sweep produced no candidates");
+        assert!(
+            !candidates.is_empty(),
+            "sweep produced no candidates"
+        );
         let c = &candidates[0];
         assert!(is_prob_prime(&c.r, 25));
         assert!(is_prob_prime(&c.q, 25));
