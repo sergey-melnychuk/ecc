@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Read;
 use std::ops::{Add, Div, Sub};
 
 use rug::{rand::RandState, Integer as Int};
@@ -46,7 +48,15 @@ impl Modulus {
     }
 
     pub fn rand(&self) -> Int {
+        // `RandState::new()` uses a fixed default seed; reseed from the OS
+        // RNG so successive calls produce independent values.
         let mut rng = RandState::new();
+        let mut seed_bytes = [0u8; 32];
+        File::open("/dev/urandom")
+            .and_then(|mut f| f.read_exact(&mut seed_bytes))
+            .expect("seed Modulus::rand from /dev/urandom");
+        let seed = Int::from_digits(&seed_bytes, rug::integer::Order::Msf);
+        rng.seed(&seed);
         self.n.clone().random_below(&mut rng)
     }
 
@@ -131,5 +141,24 @@ impl Modulus {
                 return Some(x);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rand_is_nondeterministic() {
+        // Successive calls must not return the same value (with overwhelming
+        // probability over a large modulus). Two consecutive calls returning
+        // the same value would catch a regression to the unseeded default.
+        let m = Modulus::new(&Int::from_str_radix(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F",
+            16,
+        ).unwrap());
+        let a = m.rand();
+        let b = m.rand();
+        assert_ne!(a, b);
     }
 }

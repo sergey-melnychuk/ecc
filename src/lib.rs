@@ -2,9 +2,12 @@
 #![allow(clippy::explicit_counter_loop)]
 #![allow(clippy::manual_memcpy)]
 
+pub mod bls;
 pub mod elliptic;
 pub mod hash;
 pub mod modulus;
+pub mod pairing;
+pub mod poly_elliptic;
 pub mod polynomial;
 pub mod snark;
 

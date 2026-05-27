@@ -39,18 +39,18 @@ impl Curve {
 
         let m = Modulus::new(&self.modulus);
 
-        let (num, den) = if m.add(&p.y, &q.y).is_zero() {
-            let num = m.sub(&q.y, &p.y);
-            let den = m.sub(&q.x, &q.y);
-            (num, den)
-        } else {
-            let num = m.add(
-                &m.add(&m.mul(&p.x, &p.x), &m.mul(&p.x, &q.x)),
-                &m.add(&m.mul(&q.x, &q.x), &self.a),
-            );
-            let den = m.add(&p.y, &q.y);
-            (num, den)
-        };
+        // P + (-P) = O (point at infinity).
+        // Covers both p == -q (different points, y1 = -y2) and doubling
+        // a 2-torsion point (p == q with y = 0).
+        if p.x == q.x && m.add(&p.y, &q.y).is_zero() {
+            return Point::inf();
+        }
+
+        let num = m.add(
+            &m.add(&m.mul(&p.x, &p.x), &m.mul(&p.x, &q.x)),
+            &m.add(&m.mul(&q.x, &q.x), &self.a),
+        );
+        let den = m.add(&p.y, &q.y);
 
         let lambda = m.div(&num, &den).expect("lambda");
         let x = m.sub(&m.sub(&m.mul(&lambda, &lambda), &p.x), &q.x);
@@ -85,6 +85,9 @@ impl Curve {
     }
 
     pub fn fits(&self, p: &Point) -> bool {
+        if p.is_inf() {
+            return true;
+        }
         let m = Modulus::new(&self.modulus);
         let lhs = m.mul(&p.y, &p.y);
         let rhs = m.add(
@@ -130,22 +133,24 @@ impl Curve {
 pub struct Point {
     pub x: Int,
     pub y: Int,
+    inf: bool,
 }
 
 impl Point {
     pub fn new(x: Int, y: Int) -> Self {
-        Self { x, y }
+        Self { x, y, inf: false }
     }
 
     pub fn inf() -> Self {
         Self {
             x: Int::ZERO,
             y: Int::ZERO,
+            inf: true,
         }
     }
 
     pub fn is_inf(&self) -> bool {
-        self.x.is_zero() && self.y.is_zero()
+        self.inf
     }
 }
 
@@ -234,6 +239,44 @@ mod tests {
         let c = ec.add(&a, &b);
         let d = ec.mul(p, &Int::from(42));
         assert_eq!(c, d);
+    }
+
+    #[test]
+    fn test_point_inf_is_distinct_from_origin() {
+        // Infinity must not compare equal to an affine (0, 0) point —
+        // otherwise curves with b == 0 would alias.
+        let inf = Point::inf();
+        let origin = Point::new(Int::ZERO, Int::ZERO);
+        assert!(inf.is_inf());
+        assert!(!origin.is_inf());
+        assert_ne!(inf, origin);
+    }
+
+    #[test]
+    fn test_curve_bn254_p_plus_neg_p_is_inf() {
+        let ec = curve_bn254();
+        let p = ec.base.clone();
+        let modulus = Modulus::new(&ec.modulus);
+        let neg_p = Point::new(p.x.clone(), modulus.neg(&p.y));
+        let sum = ec.add(&p, &neg_p);
+        assert!(sum.is_inf(), "P + (-P) must be the point at infinity");
+    }
+
+    #[test]
+    fn test_curve_bn254_inf_is_identity() {
+        let ec = curve_bn254();
+        let p = ec.base.clone();
+        let inf = Point::inf();
+        assert_eq!(ec.add(&p, &inf), p);
+        assert_eq!(ec.add(&inf, &p), p);
+    }
+
+    #[test]
+    fn test_curve_bn254_order_times_base_is_inf() {
+        // [n]G = O for any G in the prime-order subgroup.
+        let ec = curve_bn254();
+        let result = ec.mul(&ec.base, &ec.order);
+        assert!(result.is_inf());
     }
 
     #[test]
