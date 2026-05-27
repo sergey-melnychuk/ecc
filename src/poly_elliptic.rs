@@ -312,11 +312,70 @@ fn is_quad_residue(
     r.degree() == 0 && r.get(0) == 1
 }
 
+/// Brute-force sqrt for small GF(p^k): enumerate every element of the
+/// extension field and return one whose square is `a`. Last-resort fallback
+/// for the tiny `F_43²` demo curve, where the Tonelli-Shanks lifted to
+/// polynomials occasionally hits a state it can't reduce out of (`M = 1,
+/// t = -1`) — that state requires multiplying R by sqrt(-1), which the
+/// algorithm doesn't have direct access to. Brute force is `O(p^k)` so this
+/// is only viable for very small fields; on production-sized curves the
+/// regular T-S path covers all inputs.
+fn poly_sqrt_bruteforce(
+    a: &Polynomial,
+    irrd: &Polynomial,
+    pm: &Modulus,
+) -> Option<Polynomial> {
+    let k = irrd.degree();
+    let p = pm.n.clone();
+    let total: Int = p.clone().pow(k as u32);
+    let mut idx = Int::from(0);
+    while idx < total {
+        let mut cand = Polynomial::zeros(k);
+        let mut rem = idx.clone();
+        for i in 0..k {
+            let d = rem.clone() % &p;
+            cand.set(i, d.clone());
+            rem /= &p;
+        }
+        let cand = cand.trim();
+        let sq = cand.mul(&cand, irrd, pm);
+        if coef_eq_mod(&sq, a, pm) {
+            return Some(cand);
+        }
+        idx += 1;
+    }
+    None
+}
+
 /// Square root in GF(p^k). Fast path when `p^k ≡ 3 (mod 4)`; otherwise
 /// Tonelli–Shanks lifted to polynomials. Mirrors the structure of
 /// [`crate::modulus::Modulus::sqrt`] — same Wikipedia notation (M, c, t, R)
 /// to keep the algorithm legible. Returns None on non-residues.
+///
+/// When the lifted Tonelli-Shanks hits a state it can't reduce out of
+/// (which happens for some QRs in very small extension fields), this falls
+/// back to [`poly_sqrt_bruteforce`] rather than returning None — the demo
+/// binaries (`weil`, `tate`) need every sqrt to enumerate every point.
 fn poly_sqrt(
+    a: &Polynomial,
+    irrd: &Polynomial,
+    pm: &Modulus,
+) -> Option<Polynomial> {
+    if let Some(s) = poly_sqrt_inner(a, irrd, pm) {
+        return Some(s);
+    }
+    // Tonelli-Shanks bailed but `a` may still be a QR (small-field edge
+    // case). Try brute force only when the field is small enough to
+    // enumerate cheaply (≤ 2^20 elements).
+    let pk_bits =
+        pm.n.significant_bits() * irrd.degree() as u32;
+    if pk_bits <= 20 && is_quad_residue(a, irrd, pm) {
+        return poly_sqrt_bruteforce(a, irrd, pm);
+    }
+    None
+}
+
+fn poly_sqrt_inner(
     a: &Polynomial,
     irrd: &Polynomial,
     pm: &Modulus,
@@ -374,6 +433,13 @@ fn poly_sqrt(
                 return None;
             }
             tmp = tmp.mul(&tmp, irrd, pm);
+        }
+        // After the inner loop exits we need `i < M` for the shift below
+        // to be non-negative. The while-guard above only fires when we
+        // *enter* the loop body — if t² == 1 immediately and M == 1 we
+        // get here with i == M, so re-check.
+        if i + 1 > m_state {
+            return None;
         }
         // b = c^(2^(M - i - 1))
         let shift = m_state - i - 1;

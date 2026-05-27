@@ -15,7 +15,7 @@ use std::path::Path;
 use rug::Integer as Int;
 
 use crate::elliptic::{Curve, Point};
-use crate::hash::{hash, hash_n};
+use crate::hash::hash;
 use crate::pairing::weil;
 use crate::poly_elliptic::{PolyCurve, PolyPoint};
 use crate::polynomial::Polynomial;
@@ -117,13 +117,6 @@ impl BlsSystem {
         acc
     }
 
-    /// Deterministic key derivation from a passphrase (utility for demos).
-    /// Hashes the bytes to a torsion scalar.
-    pub fn derive_sk(&self, seed: &[u8], domain: &[u8]) -> Int {
-        let modulus = crate::modulus::Modulus::new(&self.tor);
-        let h = hash_n(&[domain, seed]);
-        modulus.add(&h, &Int::ZERO)
-    }
 }
 
 /// Build the tiny demo system used in chapters 16–18: p=43, k=2, tor=11.

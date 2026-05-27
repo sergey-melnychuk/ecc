@@ -482,10 +482,9 @@ mod tests {
 
         for k in 1..101 {
             let p = ec.mul(&ec.base, &Int::from(k));
-            if let Some((a, b)) = ec.apply(&p.x) {
-                assert!(a == p || b == p, "failed: k={k}");
-            } else {
-                assert!(false, "failed: k={k}");
+            match ec.apply(&p.x) {
+                Some((a, b)) => assert!(a == p || b == p, "failed: k={k}"),
+                None => panic!("apply returned None for k={k}"),
             }
         }
     }

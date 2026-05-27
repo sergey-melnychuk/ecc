@@ -148,20 +148,20 @@ impl Modulus {
 mod tests {
     use super::*;
 
-    /// Exercise Tonelli-Shanks (the slow `p ≡ 1 mod 4` path) — the BN254 base
-    /// field prime has p ≡ 1 mod 4 in the lower bits' sense for this test, so
-    /// the algorithm actually runs the Tonelli-Shanks loop. We square a known
-    /// integer and verify sqrt recovers it (up to sign).
+    /// Exercise the slow `p ≡ 1 mod 4` Tonelli-Shanks path on a tiny prime
+    /// (p = 13). BN254 and the book's named curves all have p ≡ 3 mod 4 and
+    /// therefore never run the loop in production — `curve_11` from chapter
+    /// 18 was the first real-world consumer that exposed the original bugs.
     #[test]
     fn test_sqrt_tonelli_shanks_path() {
         // Pick a prime that is ≡ 1 mod 4 to force the slow path.
         // 13 ≡ 1 mod 4. has_sqrt(4) is true, sqrt(4) ∈ {2, 11}.
         let m = Modulus::new(&Int::from(13));
         let s = m.sqrt(&Int::from(4)).expect("sqrt(4) mod 13");
-        assert!(s == Int::from(2) || s == Int::from(11));
+        assert!(s == 2 || s == 11);
         // Another QR: sqrt(9) ∈ {3, 10}.
         let s = m.sqrt(&Int::from(9)).expect("sqrt(9) mod 13");
-        assert!(s == Int::from(3) || s == Int::from(10));
+        assert!(s == 3 || s == 10);
         // Non-residue: sqrt(2) returns None.
         assert!(m.sqrt(&Int::from(2)).is_none());
     }

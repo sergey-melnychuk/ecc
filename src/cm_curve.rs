@@ -11,9 +11,11 @@
 //!   3. Set `c = j / (1728 - j) mod p`, then `a4 = 3c`, `a6 = 2c`.
 //!   4. If `#E = p+1-t` matches, done; otherwise the *twist* is the right curve.
 //!
-//! For HCPs of degree ≥ 3 we'd need a full polynomial-factoring routine
-//! (Cantor–Zassenhaus); this port supports degree 1 and 2 (which already
-//! covers most discriminants the curve search produces).
+//! Linear HCPs (class number 1) get a one-line root; quadratic HCPs use the
+//! closed-form quadratic formula in F_p (relying on the now-fixed
+//! [`Modulus::sqrt`] for Tonelli–Shanks). Higher-degree HCPs are factored
+//! via Cantor–Zassenhaus over F_p: first `gcd(x^p − x, H_D)` isolates the
+//! linear factors, then random `(x+r)^((p-1)/2) − 1` splits recursively.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -146,26 +148,24 @@ fn two_roots(coefs: &[Int], m: &Modulus) -> Option<(Int, Int)> {
     if coefs.len() != 3 {
         return None;
     }
-    let mut a = m.add(&coefs[2], &Int::ZERO);
-    let mut b = m.add(&coefs[1], &Int::ZERO);
-    let mut c = m.add(&coefs[0], &Int::ZERO);
-    if a != 1 {
+    // Normalize the leading coef to 1; after that we only need b and c.
+    let a = m.add(&coefs[2], &Int::ZERO);
+    let (b, c) = if a != 1 {
         let inv_a = m.inv(&a)?;
-        b = m.mul(&b, &inv_a);
-        c = m.mul(&c, &inv_a);
-        a = Int::from(1);
-    }
-    // discriminant = b² - 4c
-    let b_sq = m.mul(&b, &b);
-    let four_c = m.mul(&Int::from(4), &c);
-    let disc = m.sub(&b_sq, &four_c);
+        (m.mul(&coefs[1], &inv_a), m.mul(&coefs[0], &inv_a))
+    } else {
+        (
+            m.add(&coefs[1], &Int::ZERO),
+            m.add(&coefs[0], &Int::ZERO),
+        )
+    };
+    // roots = (-b ± √(b² - 4c)) / 2
+    let disc = m.sub(&m.mul(&b, &b), &m.mul(&Int::from(4), &c));
     let sqrt_disc = m.sqrt(&disc)?;
-    // roots = (-b ± sqrt(disc)) / 2
     let inv_2 = m.inv(&Int::from(2))?;
     let neg_b = m.neg(&b);
     let r1 = m.mul(&m.add(&neg_b, &sqrt_disc), &inv_2);
     let r2 = m.mul(&m.sub(&neg_b, &sqrt_disc), &inv_2);
-    let _ = a;
     Some((r1, r2))
 }
 
@@ -411,36 +411,24 @@ pub fn get_curve(
     None
 }
 
-/// Build a `Curve` if a random point R on `y² = x³ + a4·x + a6 mod p`
-/// satisfies `[card_e]·R = O`. Tries up to 32 random base points before
-/// giving up; this is high enough that the probability of all 32 R's having
-/// small order is negligible.
+/// Build a `Curve` and validate it by finding a non-trivial point P on
+/// `y² = x³ + a4·x + a6 mod p` and checking `[card_e]·P = O`. Returns None
+/// if no base point is found within a reasonable sweep, or if the
+/// cardinality check fails (in which case the caller will try the twist).
 fn try_card(
     a4: &Int,
     a6: &Int,
     p: &Int,
     card_e: &Int,
 ) -> Option<Curve> {
-    let m = Modulus::new(p);
-    // Need a non-infinite base point. Sweep until we find one.
-    let mut base = Point::inf();
-    for cand_x in 0..p.significant_bits().min(64) as i64 + 200 {
-        let placeholder = Curve::new(
-            p.clone(),
-            card_e.clone(),
-            Point::new(Int::ZERO, Int::ZERO),
-            a4.clone(),
-            a6.clone(),
-        );
-        if let Some(pt) = placeholder.find(&Int::from(cand_x), 1) {
-            base = pt;
-            break;
-        }
-        let _ = &m;
-    }
-    if base.is_inf() {
-        return None;
-    }
+    let curve = Curve::new(
+        p.clone(),
+        card_e.clone(),
+        Point::new(Int::ZERO, Int::ZERO),
+        a4.clone(),
+        a6.clone(),
+    );
+    let base = curve.find(&Int::ZERO, 256)?;
     let curve = Curve::new(
         p.clone(),
         card_e.clone(),
